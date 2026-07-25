@@ -1,0 +1,256 @@
+service: compliance-tracker-api
+frameworkVersion: '3'
+useDotenv: true
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ca-west-1
+  stage: prod
+  memorySize: 256
+  timeout: 15
+  environment:
+    NODE_ENV: production
+    DYNAMO_TABLE: ${env:DYNAMO_TABLE, 'compliance-tracker-prod'}
+    CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
+    SES_FROM_EMAIL: ${env:SES_FROM_EMAIL, '"ClearComply Compliance Bot" <noreply@maidlink.ca>'}
+    SES_CONFIG_SET: ${env:SES_CONFIG_SET, ''}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:TransactWriteItems
+          Resource:
+            - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'compliance-tracker-prod'}
+            - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'compliance-tracker-prod'}/index/*
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource:
+            - arn:aws:ses:us-east-1:946839354953:identity/maidlink.ca
+            - arn:aws:ses:us-east-1:946839354953:configuration-set/MaidlinkConfigSet-prod
+
+resources:
+  Resources:
+    ComplianceTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${env:DYNAMO_TABLE, 'compliance-tracker-prod'}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+          - AttributeName: entityType
+            AttributeType: S
+          - AttributeName: name
+            AttributeType: S
+          - AttributeName: subId
+            AttributeType: S
+          - AttributeName: projectId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1-entityType-name
+            KeySchema:
+              - AttributeName: entityType
+                KeyType: HASH
+              - AttributeName: name
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI2-subId-projectId
+            KeySchema:
+              - AttributeName: subId
+                KeyType: HASH
+              - AttributeName: projectId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+functions:
+  # --- read endpoints ---
+  listSubcontractors:
+    handler: src/handlers/listSubcontractors.handler
+    events:
+      - http:
+          path: /subcontractors
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  getSubcontractor:
+    handler: src/handlers/getSubcontractor.handler
+    events:
+      - http:
+          path: /subcontractors/{subId}
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  listProjects:
+    handler: src/handlers/listProjects.handler
+    events:
+      - http:
+          path: /projects
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  getProjectStatus:
+    handler: src/handlers/getProjectStatus.handler
+    events:
+      - http:
+          path: /projects/{projectId}/status
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  listMissingDocuments:
+    handler: src/handlers/listMissingDocuments.handler
+    events:
+      - http:
+          path: /missing-documents
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  # --- document submission (re-enters AI validation) ---
+  submitSubDocument:
+    handler: src/handlers/submitSubDocument.handler
+    events:
+      - http:
+          path: /subcontractors/{subId}/documents/{docType}/submit
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  submitProjectDocument:
+    handler: src/handlers/submitProjectDocument.handler
+    events:
+      - http:
+          path: /projects/{projectId}/subcontractors/{subId}/documents/{docType}/submit
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  # --- cascade checks (real SES send) ---
+  runSubCascadeCheck:
+    handler: src/handlers/runSubCascadeCheck.handler
+    events:
+      - http:
+          path: /subcontractors/{subId}/run-cascade-check
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  runProjectCascadeCheck:
+    handler: src/handlers/runProjectCascadeCheck.handler
+    events:
+      - http:
+          path: /projects/{projectId}/subcontractors/{subId}/run-cascade-check
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  # --- human actions (never automatic) ---
+  suspendSubOnboarding:
+    handler: src/handlers/suspendSubOnboarding.handler
+    events:
+      - http:
+          path: /subcontractors/{subId}/suspend
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  reinstateSubOnboarding:
+    handler: src/handlers/reinstateSubOnboarding.handler
+    events:
+      - http:
+          path: /subcontractors/{subId}/reinstate
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  withholdPayment:
+    handler: src/handlers/withholdPayment.handler
+    events:
+      - http:
+          path: /projects/{projectId}/subcontractors/{subId}/withhold-payment
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  releasePayment:
+    handler: src/handlers/releasePayment.handler
+    events:
+      - http:
+          path: /projects/{projectId}/subcontractors/{subId}/release-payment
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  suspendSubcontractor:
+    handler: src/handlers/suspendSubcontractor.handler
+    events:
+      - http:
+          path: /projects/{projectId}/subcontractors/{subId}/suspend
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+  reinstateSubcontractor:
+    handler: src/handlers/reinstateSubcontractor.handler
+    events:
+      - http:
+          path: /projects/{projectId}/subcontractors/{subId}/reinstate
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type]
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node20
+    platform: node
+  serverless-offline:
+    httpPort: 3001
+    lambdaPort: 3101
+    host: localhost
+    noPrependStageInUrl: true
+    dotenv: ../../.env

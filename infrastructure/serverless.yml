@@ -1,0 +1,85 @@
+service: compliance-tracker-infra
+frameworkVersion: '3'
+
+# Deploys: S3 bucket (private-ish, public-read policy) + CloudFront distribution.
+# No custom domain — CloudFront default certificate is used.
+# Single environment — stage is always 'prod'.
+#
+# Deploy: cd infrastructure && npx serverless deploy --stage prod
+
+provider:
+  name: aws
+  region: ca-west-1
+  stage: prod
+
+resources:
+  Resources:
+
+    # ── S3 — public read (OAI has compatibility issues with ca-west-1) ────────
+    FrontendBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+
+    FrontendBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref FrontendBucket
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal: '*'
+              Action: s3:GetObject
+              Resource: !Sub '${FrontendBucket.Arn}/*'
+
+    # ── CloudFront — no custom domain, default CloudFront certificate ────────
+    FrontendDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          DefaultRootObject: index.html
+          Origins:
+            - Id: S3Origin
+              DomainName: !GetAtt FrontendBucket.RegionalDomainName
+              S3OriginConfig:
+                OriginAccessIdentity: ''
+          DefaultCacheBehavior:
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+            AllowedMethods: [GET, HEAD, OPTIONS]
+          # SPA routing — return index.html on 403/404 so React Router handles paths
+          CustomErrorResponses:
+            - ErrorCode: 403
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+          ViewerCertificate:
+            CloudFrontDefaultCertificate: true
+          PriceClass: PriceClass_100
+
+  Outputs:
+    FrontendBucketName:
+      Value: !Ref FrontendBucket
+      Export:
+        Name: compliance-tracker-infra-prod-FrontendBucket
+
+    FrontendDistributionId:
+      Value: !Ref FrontendDistribution
+      Export:
+        Name: compliance-tracker-infra-prod-FrontendDistributionId
+
+    FrontendUrl:
+      Value: !Sub 'https://${FrontendDistribution.DomainName}'
+      Export:
+        Name: compliance-tracker-infra-prod-FrontendUrl

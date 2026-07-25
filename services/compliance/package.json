@@ -1,0 +1,30 @@
+{
+  "name": "@compliance-tracker/api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "offline": "npx serverless offline",
+    "deploy": "npx serverless deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "@aws-sdk/client-ses": "^3.600.0",
+    "@compliance-tracker/shared": "*",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.8",
+    "aws-sdk-client-mock": "^4.1.0",
+    "serverless": "^3.38.0",
+    "serverless-esbuild": "^1.52.1",
+    "serverless-offline": "^13.6.0",
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.7"
+  }
+}

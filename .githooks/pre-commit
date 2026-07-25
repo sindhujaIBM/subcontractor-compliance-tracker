@@ -1,0 +1,114 @@
+#!/bin/sh
+# Pre-commit: sensitive data guard + test runner
+# Blocks commits containing secrets, credentials, or private keys.
+# Also runs the full test suite before every commit.
+
+set -e
+
+echo ""
+echo "╔══════════════════════════════════════╗"
+echo "║      Pre-commit security scan        ║"
+echo "╚══════════════════════════════════════╝"
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED" ]; then
+  echo "No staged files — skipping scan."
+  exit 0
+fi
+
+FAILED=0
+
+# ── 1. Block .env files ───────────────────────────────────────────────────────
+echo ""
+echo "▶ Checking for .env files…"
+# Allow .env.example and .env.sample — they contain placeholders, not real secrets
+ENV_FILES=$(echo "$STAGED" | grep -E '(^|/)\.env(\.|$)' | grep -vE '\.(example|sample|template)$' || true)
+if [ -n "$ENV_FILES" ]; then
+  echo ""
+  echo "❌ Blocked: .env file(s) staged for commit:"
+  echo "$ENV_FILES" | sed 's/^/   /'
+  echo "   Add them to .gitignore and unstage with: git reset HEAD <file>"
+  FAILED=1
+fi
+
+# ── 2. Block private key / cert files ────────────────────────────────────────
+echo "▶ Checking for key/cert files…"
+KEY_FILES=$(echo "$STAGED" | grep -E '\.(pem|key|p12|pfx|cer|crt)$' || true)
+if [ -n "$KEY_FILES" ]; then
+  echo ""
+  echo "❌ Blocked: private key/cert file(s) staged for commit:"
+  echo "$KEY_FILES" | sed 's/^/   /'
+  FAILED=1
+fi
+
+# ── 3. Scan file content for secret patterns ─────────────────────────────────
+echo "▶ Scanning file content for secrets…"
+
+PATTERNS="
+AKIA[0-9A-Z]{16}
+ASIA[0-9A-Z]{16}
+AGPA[0-9A-Z]{16}
+AROA[0-9A-Z]{16}
+(?i)(aws_secret_access_key|aws_secret_key)\s*[=:]\s*['\"]?[A-Za-z0-9/+=]{40}
+(?i)(google_client_secret|oauth_secret|client_secret)\s*[=:]\s*['\"]?[A-Za-z0-9_\-]{20,}
+(?i)(jwt_secret|jwt_key|token_secret)\s*[=:]\s*['\"]?[A-Za-z0-9_\-]{20,}
+(?i)(db_password|database_password|db_pass|postgres_password)\s*[=:]\s*['\"]?.{8,}
+-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY
+(?i)(api_key|apikey|api_secret)\s*[=:]\s*['\"]?[A-Za-z0-9_\-]{20,}
+GOCSPX-[A-Za-z0-9_\-]{28,}
+"
+
+SECRET_HITS=""
+for FILE in $STAGED; do
+  [ -f "$FILE" ] || continue
+  # Skip binary files
+  if file "$FILE" | grep -qE 'binary|image|compressed'; then
+    continue
+  fi
+  CONTENT=$(git show ":$FILE" 2>/dev/null || true)
+  while IFS= read -r PATTERN; do
+    [ -z "$PATTERN" ] && continue
+    HIT=$(echo "$CONTENT" | grep -P "$PATTERN" 2>/dev/null || true)
+    if [ -n "$HIT" ]; then
+      SECRET_HITS="$SECRET_HITS\n   $FILE: matched pattern [$PATTERN]"
+      FAILED=1
+      break
+    fi
+  done <<EOF
+$(echo "$PATTERNS")
+EOF
+done
+
+if [ -n "$SECRET_HITS" ]; then
+  echo ""
+  echo "❌ Blocked: potential secrets found in staged files:"
+  printf "%b\n" "$SECRET_HITS"
+  echo ""
+  echo "   If this is a false positive, use: git commit --no-verify"
+fi
+
+echo ""
+if [ "$FAILED" -eq 0 ]; then
+  echo "✅ Security scan passed — committing."
+  echo ""
+else
+  echo "🚫 Commit blocked. Fix the issues above before committing."
+  echo ""
+  exit 1
+fi
+
+# ── 4. Run test suite ─────────────────────────────────────────────────────────
+echo "╔══════════════════════════════════════╗"
+echo "║           Running tests              ║"
+echo "╚══════════════════════════════════════╝"
+echo ""
+npm test
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "🚫 Tests failed. Commit aborted."
+  exit 1
+fi
+echo ""
+echo "✅ All tests passed. Proceeding with commit."
+echo ""

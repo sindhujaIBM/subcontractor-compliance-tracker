@@ -1,0 +1,35 @@
+node_modules/
+dist/
+.esbuild/
+.serverless/
+*.js.map
+
+# Environment / secrets — never commit
+.env
+.env.local
+.env.*.local
+.env.production
+services/**/.env
+frontend/.env.local
+frontend/.env.production
+
+# Keys / certs
+*.pem
+*.key
+*.p12
+*.pfx
+
+# AWS
+.aws/
+aws-exports.js
+
+# Claude Code local config
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage / build artifacts
+coverage/
+*.tsbuildinfo

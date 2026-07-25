@@ -1,0 +1,28 @@
+{
+  "name": "subcontractor-compliance-tracker",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace=packages/shared && concurrently -n api,web -c cyan,white \"npm run offline --workspace=services/compliance\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "seed": "node scripts/seed.mjs",
+    "seed:scenarios": "node scripts/seed-scenarios.mjs",
+    "prepare": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.7"
+  }
+}
