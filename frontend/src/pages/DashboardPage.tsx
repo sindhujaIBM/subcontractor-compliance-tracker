@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type Assignment, type ProjectSummary, type SubcontractorSummary } from '../api/client';
 import { StatusPill } from '../components/subs/StatusPill';
+import { DocRequirementsPanel } from '../components/subs/DocRequirementsPanel';
 import { PageShell } from '../components/layout/PageShell';
 
 interface ProjectGroup {
@@ -32,6 +33,8 @@ export function DashboardPage() {
   return (
     <PageShell title="Compliance Dashboard" subtitle="Every subcontractor, across every active project, in one place.">
       <div className="space-y-8">
+        <DocRequirementsPanel />
+
         {groups.map(({ project, assignments }) => (
           <div key={project.projectId} className="rounded-lg border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
