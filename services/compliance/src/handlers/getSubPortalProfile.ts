@@ -1,5 +1,5 @@
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { withSubAuth, ok, getDynamo, TABLE, onboardingColor } from '@compliance-tracker/shared';
+import { withSubAuth, ok, getDynamo, TABLE, onboardingColor, projectAssignmentColor, worstColor, describeTopIssue } from '@compliance-tracker/shared';
 
 /**
  * GSI2 (PK=subId, SK=projectId) is sparse on *any* item that happens to
@@ -48,13 +48,23 @@ export const handler = withSubAuth(async (_event, subId) => {
     projectId: i.projectId,
     mobilizedDate: i.mobilizedDate,
     suspended: i.suspended,
+    suspendedReason: i.suspendedReason,
     paymentWithheld: i.paymentWithheld,
+    paymentWithheldReason: i.paymentWithheldReason,
     lateCount: i.lateCount,
     missingCount: i.missingCount,
     payrollCascadeStage: i.payrollCascadeStage,
     workforceCascadeStage: i.workforceCascadeStage,
+    color: projectAssignmentColor({
+      suspended: i.suspended,
+      payrollCascadeStage: i.payrollCascadeStage,
+      workforceCascadeStage: i.workforceCascadeStage,
+      paymentWithheld: i.paymentWithheld,
+    }),
     documents: projectDocs.filter((d) => d.projectId === i.projectId),
   }));
+
+  const subForColor = { suspended: metadata.suspended, suspendedReason: metadata.suspendedReason, onboardingStatus: metadata.onboardingStatus };
 
   return ok({
     subcontractor: {
@@ -63,8 +73,9 @@ export const handler = withSubAuth(async (_event, subId) => {
       trade: metadata.trade,
       onboardingStatus: metadata.onboardingStatus,
       suspended: metadata.suspended,
-      color: onboardingColor({ suspended: metadata.suspended, onboardingStatus: metadata.onboardingStatus }),
+      color: worstColor([onboardingColor(subForColor), ...projects.map((p) => p.color)]),
     },
+    topIssue: describeTopIssue(subForColor, projects),
     documents,
     projects,
   });

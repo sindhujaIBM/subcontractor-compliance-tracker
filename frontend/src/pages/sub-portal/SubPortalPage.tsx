@@ -5,8 +5,16 @@ import { StatusPill } from '../../components/subs/StatusPill';
 import { DocUploadButton } from '../../components/subs/DocUploadButton';
 import { DocumentHistoryTable } from '../../components/subs/DocumentHistoryTable';
 
+const STAGE_LABEL: Record<string, string> = {
+  reminderEarly: 'Early reminder sent',
+  reminderEndOfDay: 'Due-date reminder sent',
+  finalCheck: 'In final check window',
+  escalated: 'Escalated — awaiting decision',
+};
+
 interface Profile {
   subcontractor: { subId: string; name: string; trade: string; onboardingStatus: string; suspended: boolean; color: 'green' | 'yellow' | 'red' };
+  topIssue: string | null;
   documents: SubPortalDocument[];
   projects: SubPortalProject[];
 }
@@ -25,7 +33,7 @@ export function SubPortalPage() {
   }, []);
 
   if (!data) return <div className="p-8">Loading…</div>;
-  const { subcontractor: s, documents, projects } = data;
+  const { subcontractor: s, topIssue, documents, projects } = data;
 
   async function uploadOnboardingDoc(docType: 'COI' | 'W9', file: File) {
     const { uploadUrl } = await subPortalApi.requestUploadUrl(s.subId, docType, file.name, file.type || 'application/pdf');
@@ -63,6 +71,16 @@ export function SubPortalPage() {
       </header>
 
       <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+        {topIssue && (
+          <div
+            className={`rounded-lg border p-4 text-sm font-medium ${
+              s.color === 'red' ? 'border-status-red bg-status-redBg text-status-red' : 'border-status-yellow bg-status-yellowBg text-status-yellow'
+            }`}
+          >
+            {topIssue}
+          </div>
+        )}
+
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <div className="mb-3 flex items-center gap-2">
             <StatusPill color={s.color} />
@@ -85,13 +103,19 @@ export function SubPortalPage() {
           const month = today.toISOString().slice(0, 7);
           return (
             <div key={p.projectId} className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="mb-1 text-sm font-semibold text-slate-700">Project: {p.projectId}</h3>
-              <p className="mb-3 text-xs text-slate-500">
-                Mobilized {p.mobilizedDate ? new Date(p.mobilizedDate).toLocaleDateString() : '—'} · Late submissions: {p.lateCount} · Missing
-                submissions: {p.missingCount}
-                {p.paymentWithheld && ' · Payment withheld'}
-                {p.suspended && ' · Suspended'}
-              </p>
+              <div className="mb-1 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-slate-700">Project: {p.projectId}</h3>
+                <StatusPill color={p.color} />
+              </div>
+              <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                <span>Mobilized {p.mobilizedDate ? new Date(p.mobilizedDate).toLocaleDateString() : '—'}</span>
+                <span>Late submissions: {p.lateCount}</span>
+                <span>Missing submissions: {p.missingCount}</span>
+                {p.payrollCascadeStage && <span>Payroll: {STAGE_LABEL[p.payrollCascadeStage]}</span>}
+                {p.workforceCascadeStage && <span>Workforce report: {STAGE_LABEL[p.workforceCascadeStage]}</span>}
+                {p.paymentWithheld && <span className="font-medium text-status-yellow">Payment withheld{p.paymentWithheldReason && ` — ${p.paymentWithheldReason}`}</span>}
+                {p.suspended && <span className="font-medium text-status-red">Suspended{p.suspendedReason && ` — ${p.suspendedReason}`}</span>}
+              </div>
               <div className="mb-3 flex flex-wrap gap-2">
                 <DocUploadButton
                   label="Upload Certified Payroll Report"

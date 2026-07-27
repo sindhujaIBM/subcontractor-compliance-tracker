@@ -1,5 +1,16 @@
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, NotFoundError, onboardingColor } from '@compliance-tracker/shared';
+import {
+  withComplianceAuth,
+  ok,
+  getDynamo,
+  TABLE,
+  ValidationError,
+  NotFoundError,
+  onboardingColor,
+  projectAssignmentColor,
+  worstColor,
+  describeTopIssue,
+} from '@compliance-tracker/shared';
 
 /**
  * GSI2 (PK=subId, SK=projectId) is sparse on *any* item with both
@@ -58,11 +69,23 @@ export const handler = withComplianceAuth(async (event) => {
     projectId: i.projectId,
     mobilizedDate: i.mobilizedDate,
     suspended: i.suspended,
+    suspendedReason: i.suspendedReason,
     paymentWithheld: i.paymentWithheld,
+    paymentWithheldReason: i.paymentWithheldReason,
+    payrollCascadeStage: i.payrollCascadeStage,
+    workforceCascadeStage: i.workforceCascadeStage,
     lateCount: i.lateCount,
     missingCount: i.missingCount,
+    color: projectAssignmentColor({
+      suspended: i.suspended,
+      payrollCascadeStage: i.payrollCascadeStage,
+      workforceCascadeStage: i.workforceCascadeStage,
+      paymentWithheld: i.paymentWithheld,
+    }),
     documents: projectDocs.filter((d) => d.projectId === i.projectId),
   }));
+
+  const subForColor = { suspended: metadata.suspended, suspendedReason: metadata.suspendedReason, onboardingStatus: metadata.onboardingStatus };
 
   return ok({
     subcontractor: {
@@ -75,8 +98,9 @@ export const handler = withComplianceAuth(async (event) => {
       onboardingCascadeStage: metadata.onboardingCascadeStage,
       suspended: metadata.suspended,
       suspendedReason: metadata.suspendedReason,
-      color: onboardingColor({ suspended: metadata.suspended, onboardingStatus: metadata.onboardingStatus }),
+      color: worstColor([onboardingColor(subForColor), ...projects.map((p) => p.color)]),
     },
+    topIssue: describeTopIssue(subForColor, projects),
     documents,
     actionLog,
     projects,

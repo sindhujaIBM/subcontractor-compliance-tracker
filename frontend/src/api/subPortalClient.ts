@@ -38,11 +38,14 @@ export interface SubPortalProject {
   projectId: string;
   mobilizedDate: string;
   suspended: boolean;
+  suspendedReason?: string;
   paymentWithheld: boolean;
+  paymentWithheldReason?: string;
   lateCount: number;
   missingCount: number;
   payrollCascadeStage?: string;
   workforceCascadeStage?: string;
+  color: 'green' | 'yellow' | 'red';
   documents: SubPortalDocument[];
 }
 
@@ -59,9 +62,14 @@ export async function tryLogin(subId: string, password: string): Promise<boolean
 export const subPortalApi = {
   getProfile: (subId: string) =>
     client
-      .get<{ data: { subcontractor: { subId: string; name: string; trade: string; onboardingStatus: string; suspended: boolean; color: string }; documents: SubPortalDocument[]; projects: SubPortalProject[] } }>(
-        `/sub-portal/${subId}`
-      )
+      .get<{
+        data: {
+          subcontractor: { subId: string; name: string; trade: string; onboardingStatus: string; suspended: boolean; color: string };
+          topIssue: string | null;
+          documents: SubPortalDocument[];
+          projects: SubPortalProject[];
+        };
+      }>(`/sub-portal/${subId}`)
       .then((r) => r.data.data),
 
   requestUploadUrl: (subId: string, docType: 'COI' | 'W9', filename: string, contentType: string) =>

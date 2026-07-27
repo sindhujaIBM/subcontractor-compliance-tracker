@@ -6,6 +6,13 @@ import { PageShell } from '../components/layout/PageShell';
 import { HumanActionButton } from '../components/actions/HumanActionButton';
 import { DocumentHistoryTable, type HistoryDoc } from '../components/subs/DocumentHistoryTable';
 
+const STAGE_LABEL: Record<string, string> = {
+  reminderEarly: 'Early reminder sent',
+  reminderEndOfDay: 'Due-date reminder sent',
+  finalCheck: 'In final check window',
+  escalated: 'Escalated — awaiting decision',
+};
+
 interface SubDetail {
   subcontractor: {
     subId: string;
@@ -19,15 +26,21 @@ interface SubDetail {
     suspendedReason?: string;
     color: 'green' | 'yellow' | 'red';
   };
+  topIssue: string | null;
   documents: HistoryDoc[];
   actionLog: Array<{ SK: string; timestamp: string; actor: string; actorName?: string; action: string; detail?: string; reason?: string }>;
   projects: Array<{
     projectId: string;
     mobilizedDate: string;
     suspended: boolean;
+    suspendedReason?: string;
     paymentWithheld: boolean;
+    paymentWithheldReason?: string;
+    payrollCascadeStage?: string;
+    workforceCascadeStage?: string;
     lateCount: number;
     missingCount: number;
+    color: 'green' | 'yellow' | 'red';
     documents: HistoryDoc[];
   }>;
 }
@@ -50,11 +63,21 @@ export function SubcontractorDetailPage() {
 
   if (loading || !data) return <PageShell title="Subcontractor">Loading…</PageShell>;
 
-  const { subcontractor: s, documents, actionLog, projects } = data;
+  const { subcontractor: s, topIssue, documents, actionLog, projects } = data;
 
   return (
     <PageShell title={s.name} subtitle={`${s.trade} · ${s.contactName} · ${s.contactEmail}`}>
       <div className="space-y-6">
+        {topIssue && (
+          <div
+            className={`rounded-lg border p-4 text-sm font-medium ${
+              s.color === 'red' ? 'border-status-red bg-status-redBg text-status-red' : 'border-status-yellow bg-status-yellowBg text-status-yellow'
+            }`}
+          >
+            {topIssue}
+          </div>
+        )}
+
         <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-3">
             <StatusPill color={s.color} />
@@ -107,16 +130,23 @@ export function SubcontractorDetailPage() {
           <div className="space-y-4">
             {projects.map((p) => (
               <div key={p.projectId} className="rounded-lg border border-slate-200 bg-white p-4">
-                <h3 className="mb-1 text-sm font-semibold text-slate-700">
-                  <Link to={`/projects/${p.projectId}`} className="text-brand-700 hover:underline">
-                    {p.projectId}
-                  </Link>
-                </h3>
-                <p className="mb-3 text-xs text-slate-500">
-                  Mobilized {p.mobilizedDate ? new Date(p.mobilizedDate).toLocaleDateString() : '—'} · late {p.lateCount} · missing {p.missingCount}
-                  {p.paymentWithheld && ' · payment withheld'}
-                  {p.suspended && ' · suspended'}
-                </p>
+                <div className="mb-1 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    <Link to={`/projects/${p.projectId}`} className="text-brand-700 hover:underline">
+                      {p.projectId}
+                    </Link>
+                  </h3>
+                  <StatusPill color={p.color} />
+                </div>
+                <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <span>Mobilized {p.mobilizedDate ? new Date(p.mobilizedDate).toLocaleDateString() : '—'}</span>
+                  <span>Late {p.lateCount}</span>
+                  <span>Missing {p.missingCount}</span>
+                  {p.payrollCascadeStage && <span>Payroll: {STAGE_LABEL[p.payrollCascadeStage]}</span>}
+                  {p.workforceCascadeStage && <span>Workforce report: {STAGE_LABEL[p.workforceCascadeStage]}</span>}
+                  {p.paymentWithheld && <span className="font-medium text-status-yellow">Payment withheld{p.paymentWithheldReason && ` — ${p.paymentWithheldReason}`}</span>}
+                  {p.suspended && <span className="font-medium text-status-red">Suspended{p.suspendedReason && ` — ${p.suspendedReason}`}</span>}
+                </div>
                 <DocumentHistoryTable documents={p.documents} getViewUrl={(key) => api.getDocumentViewUrl(s.subId, key)} />
               </div>
             ))}

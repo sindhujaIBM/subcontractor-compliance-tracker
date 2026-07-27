@@ -1,4 +1,5 @@
-import type { Subcontractor, ProjectSubcontractor, ComplianceColor } from '../types/domain';
+import type { Subcontractor, ProjectSubcontractor, ComplianceColor, RecurringCascadeStage } from '../types/domain';
+import { isSuspendEligible } from './cascadeEngine';
 
 /**
  * Red/yellow/green is always computed on read, never stored — mirrors the
@@ -38,4 +39,62 @@ export function worstColor(colors: ComplianceColor[]): ComplianceColor {
   if (colors.includes('red')) return 'red';
   if (colors.includes('yellow')) return 'yellow';
   return 'green';
+}
+
+export interface ProjectIssueSignal {
+  projectId: string;
+  suspended: boolean;
+  suspendedReason?: string;
+  paymentWithheld: boolean;
+  paymentWithheldReason?: string;
+  payrollCascadeStage?: RecurringCascadeStage;
+  workforceCascadeStage?: RecurringCascadeStage;
+  lateCount: number;
+  missingCount: number;
+}
+
+const CASCADE_STAGE_LABEL: Record<RecurringCascadeStage, string> = {
+  reminderEarly: 'early reminder sent',
+  reminderEndOfDay: 'due-date reminder sent',
+  finalCheck: 'in final check window',
+  escalated: 'escalated — awaiting decision',
+};
+
+/**
+ * The single most important thing to tell a human about this sub, across
+ * onboarding and every project assignment — worst issue first. A "needs
+ * attention" pill should never appear without an answer to "attention to
+ * what?" right next to it.
+ */
+export function describeTopIssue(
+  sub: Pick<Subcontractor, 'suspended' | 'suspendedReason' | 'onboardingStatus'>,
+  projects: ProjectIssueSignal[]
+): string | null {
+  if (sub.suspended) {
+    return `Onboarding suspended${sub.suspendedReason ? ` — ${sub.suspendedReason}` : ''}.`;
+  }
+
+  const suspendedProject = projects.find((p) => p.suspended);
+  if (suspendedProject) {
+    return `Suspended on ${suspendedProject.projectId}${suspendedProject.suspendedReason ? ` — ${suspendedProject.suspendedReason}` : ''}.`;
+  }
+
+  const withheldProject = projects.find((p) => p.paymentWithheld);
+  if (withheldProject) {
+    return `Payment withheld on ${withheldProject.projectId}${withheldProject.paymentWithheldReason ? ` — ${withheldProject.paymentWithheldReason}` : ''}.`;
+  }
+
+  const cascadeProject = projects.find((p) => p.payrollCascadeStage || p.workforceCascadeStage);
+  if (cascadeProject) {
+    const docLabel = cascadeProject.payrollCascadeStage ? 'Certified Payroll' : 'Monthly Workforce Report';
+    const stage = (cascadeProject.payrollCascadeStage ?? cascadeProject.workforceCascadeStage) as RecurringCascadeStage;
+    const eligible = isSuspendEligible(cascadeProject.lateCount, cascadeProject.missingCount);
+    return `${docLabel} on ${cascadeProject.projectId}: ${CASCADE_STAGE_LABEL[stage]} (${cascadeProject.lateCount} late, ${cascadeProject.missingCount} missing)${eligible ? ' — suspension now available' : ''}.`;
+  }
+
+  if (sub.onboardingStatus !== 'onboarded') {
+    return 'Still onboarding — waiting on COI/W-9.';
+  }
+
+  return null;
 }
