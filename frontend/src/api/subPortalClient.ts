@@ -25,7 +25,8 @@ client.interceptors.response.use(
 export interface SubPortalDocument {
   SK: string;
   docType: string;
-  submittedAt: string;
+  submittedAt?: string;
+  dueDate?: string;
   status: string;
   expiresAt?: string;
   rejectionReason?: string;

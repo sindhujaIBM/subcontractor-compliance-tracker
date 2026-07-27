@@ -3,7 +3,8 @@ import { useState } from 'react';
 export interface HistoryDoc {
   SK: string;
   docType: string;
-  submittedAt: string;
+  submittedAt?: string;
+  dueDate?: string;
   status: string;
   expiresAt?: string;
   rejectionReason?: string;
@@ -15,7 +16,16 @@ export interface HistoryDoc {
 function analysisMessage(doc: HistoryDoc): string {
   if (doc.status === 'valid') return 'Everything looks good.';
   if (doc.status === 'invalid') return doc.rejectionReason ?? 'Did not pass validation.';
+  if (doc.status === 'missing') return 'Missing — never submitted.';
   return 'Not yet submitted.';
+}
+
+function dateCell(doc: HistoryDoc): string {
+  if (doc.status === 'missing') return doc.dueDate ? `Due ${new Date(doc.dueDate).toLocaleDateString()}` : '—';
+  if (!doc.submittedAt) return '—';
+  const received = new Date(doc.submittedAt).toLocaleDateString();
+  if (doc.late && doc.dueDate) return `Due ${new Date(doc.dueDate).toLocaleDateString()} · Received ${received}`;
+  return received;
 }
 
 /**
@@ -50,8 +60,12 @@ export function DocumentHistoryTable({ documents, getViewUrl }: { documents: His
         {documents.map((d) => (
           <tr key={d.SK} className="border-t border-slate-100">
             <td className="py-2 font-medium">{d.docType}</td>
-            <td className="py-2 text-slate-500">{d.submittedAt ? new Date(d.submittedAt).toLocaleDateString() : '—'}</td>
-            <td className={`py-2 ${d.status === 'valid' ? 'text-status-green' : d.status === 'invalid' ? 'text-status-red' : 'text-slate-400'}`}>
+            <td className={`py-2 ${d.late || d.status === 'missing' ? 'font-medium text-status-yellow' : 'text-slate-500'}`}>{dateCell(d)}</td>
+            <td
+              className={`py-2 ${
+                d.status === 'valid' ? 'text-status-green' : d.status === 'invalid' || d.status === 'missing' ? 'text-status-red' : 'text-slate-400'
+              }`}
+            >
               {analysisMessage(d)}
             </td>
             <td className="py-2 text-right">

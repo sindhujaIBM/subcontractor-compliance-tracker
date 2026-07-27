@@ -91,6 +91,29 @@ export const handler = withComplianceAuth(async (event) => {
               },
             },
           },
+          // A never-submitted period gets its own dated row (rather than
+          // living only as a bump to the missingCount counter), so the
+          // history table can show *which* period is missing and its due
+          // date, not just a count.
+          ...(neverSubmitted
+            ? [
+                {
+                  Put: {
+                    TableName: TABLE,
+                    Item: {
+                      PK: `PROJECT#${projectId}`,
+                      SK: `SUB#${subId}#DOC#${docType}#${period}`,
+                      projectId,
+                      subId,
+                      docType,
+                      period,
+                      dueDate,
+                      status: 'missing',
+                    },
+                  },
+                },
+              ]
+            : []),
         ],
       })
     );

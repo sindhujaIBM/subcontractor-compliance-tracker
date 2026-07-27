@@ -17,6 +17,11 @@ function isProjectDocRow(sk: unknown): boolean {
   return typeof sk === 'string' && /^SUB#[^#]+#DOC#/.test(sk);
 }
 
+/** Chronological sort key for a doc row: when it happened (submitted), or when it was due if it never was. */
+function docDateKey(doc: { submittedAt?: string; dueDate?: string }): string {
+  return doc.submittedAt ?? doc.dueDate ?? '';
+}
+
 /**
  * A sub's own view of their compliance state — deliberately narrower than
  * the compliance-manager's getSubcontractor endpoint (no other subs'
@@ -39,10 +44,10 @@ export const handler = withSubAuth(async (_event, subId) => {
 
   const items = subResult.Items ?? [];
   const metadata = items.find((i) => i.SK === 'METADATA')!;
-  const documents = items.filter((i) => typeof i.SK === 'string' && i.SK.startsWith('DOC#')).sort((a, b) => String(b.SK).localeCompare(String(a.SK)));
+  const documents = items.filter((i) => typeof i.SK === 'string' && i.SK.startsWith('DOC#')).sort((a, b) => docDateKey(b).localeCompare(docDateKey(a)));
 
   const projectRows = projectsResult.Items ?? [];
-  const projectDocs = projectRows.filter((i) => isProjectDocRow(i.SK)).sort((a, b) => String(b.SK).localeCompare(String(a.SK)));
+  const projectDocs = projectRows.filter((i) => isProjectDocRow(i.SK)).sort((a, b) => docDateKey(b).localeCompare(docDateKey(a)));
 
   const projects = projectRows.filter((i) => isAssignmentRow(i.SK)).map((i) => ({
     projectId: i.projectId,

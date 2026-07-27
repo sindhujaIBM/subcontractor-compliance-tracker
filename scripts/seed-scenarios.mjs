@@ -45,7 +45,20 @@ async function seedPayrollHistory(projectId, subId, weeks, { lateWeeksAgo = [], 
   for (let w = weeks; w >= 1; w--) {
     const weekEndingDate = daysAgo(w * 7).slice(0, 10);
     const dueDate = daysAgo(w * 7 - 2); // due 2 days after the week ends, matching the reminder cadence's "2 days before" framing in reverse
-    if (missingWeeksAgo.includes(w)) continue; // never submitted for this period
+    if (missingWeeksAgo.includes(w)) {
+      // Never submitted — its own dated row (no submittedAt), not just a bump to missingCount.
+      await put({
+        PK: `PROJECT#${projectId}`,
+        SK: `SUB#${subId}#DOC#PAYROLL#${weekEndingDate}`,
+        projectId,
+        subId,
+        docType: 'PAYROLL',
+        period: weekEndingDate,
+        dueDate,
+        status: 'missing',
+      });
+      continue;
+    }
     const late = lateWeeksAgo.includes(w);
     const submittedAt = late ? new Date(new Date(dueDate).getTime() + 2 * DAY).toISOString() : dueDate;
     await put({
@@ -159,7 +172,7 @@ async function main() {
 
   // ── Yellow: guardian-fire-safety — onboarded, but active payroll cascade + suspend-eligible on lateCount ──
   await onboardSub('guardian-fire-safety');
-  await seedPayrollHistory('elm-street-water-plant', 'guardian-fire-safety', 9, { lateWeeksAgo: [2, 3, 5, 6, 8] });
+  await seedPayrollHistory('elm-street-water-plant', 'guardian-fire-safety', 9, { lateWeeksAgo: [2, 3, 5, 6, 8], missingWeeksAgo: [9] });
   await update('PROJECT#elm-street-water-plant', 'SUB#guardian-fire-safety', 'SET lateCount = :l, missingCount = :m, payrollCascadeStage = :s', { ':l': 5, ':m': 1, ':s': 'reminderEndOfDay' });
   await put(projectAction('elm-street-water-plant', 'guardian-fire-safety', daysAgo(0), 'ai', 'reminder_sent', 'Certified Payroll Report due today — reminder sent.'));
   await seedWorkforceHistory('elm-street-water-plant', 'guardian-fire-safety', 2);
