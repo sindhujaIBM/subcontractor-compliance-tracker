@@ -27,3 +27,8 @@ export async function getUploadPresignedUrl(bucket: string, key: string, content
   const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
   return getSignedUrl(getS3(), command, { expiresIn: 300 });
 }
+
+export async function getDownloadPresignedUrl(bucket: string, key: string): Promise<string> {
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  return getSignedUrl(getS3(), command, { expiresIn: 300 });
+}

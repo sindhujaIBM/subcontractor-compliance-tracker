@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { StatusPill } from '../components/subs/StatusPill';
 import { PageShell } from '../components/layout/PageShell';
 import { HumanActionButton } from '../components/actions/HumanActionButton';
+import { DocumentHistoryTable, type HistoryDoc } from '../components/subs/DocumentHistoryTable';
 
 interface SubDetail {
   subcontractor: {
@@ -18,9 +19,17 @@ interface SubDetail {
     suspendedReason?: string;
     color: 'green' | 'yellow' | 'red';
   };
-  documents: Array<{ SK: string; docType: string; submittedAt: string; status: string; expiresAt?: string; rejectionReason?: string }>;
+  documents: HistoryDoc[];
   actionLog: Array<{ SK: string; timestamp: string; actor: string; actorName?: string; action: string; detail?: string; reason?: string }>;
-  projects: Array<{ projectId: string; mobilizedDate: string; suspended: boolean; paymentWithheld: boolean; lateCount: number; missingCount: number }>;
+  projects: Array<{
+    projectId: string;
+    mobilizedDate: string;
+    suspended: boolean;
+    paymentWithheld: boolean;
+    lateCount: number;
+    missingCount: number;
+    documents: HistoryDoc[];
+  }>;
 }
 
 export function SubcontractorDetailPage() {
@@ -91,52 +100,26 @@ export function SubcontractorDetailPage() {
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <h3 className="mb-3 text-sm font-semibold text-slate-700">COI / W-9 History</h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
-                <th className="pb-2">Doc</th>
-                <th className="pb-2">Submitted</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2">Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((d) => (
-                <tr key={d.SK} className="border-t border-slate-100">
-                  <td className="py-2 font-medium">{d.docType}</td>
-                  <td className="py-2 text-slate-500">{new Date(d.submittedAt).toLocaleDateString()}</td>
-                  <td className="py-2">{d.status}</td>
-                  <td className="py-2 text-slate-500">{d.rejectionReason ?? (d.expiresAt ? `Expires ${new Date(d.expiresAt).toLocaleDateString()}` : '')}</td>
-                </tr>
-              ))}
-              {documents.length === 0 && (
-                <tr>
-                  <td className="py-2 text-slate-400" colSpan={4}>
-                    No submissions yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <DocumentHistoryTable documents={documents} getViewUrl={(key) => api.getDocumentViewUrl(s.subId, key)} />
         </div>
 
         {projects.length > 0 && (
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-700">Projects</h3>
-            <ul className="space-y-1 text-sm">
-              {projects.map((p) => (
-                <li key={p.projectId}>
+          <div className="space-y-4">
+            {projects.map((p) => (
+              <div key={p.projectId} className="rounded-lg border border-slate-200 bg-white p-4">
+                <h3 className="mb-1 text-sm font-semibold text-slate-700">
                   <Link to={`/projects/${p.projectId}`} className="text-brand-700 hover:underline">
                     {p.projectId}
                   </Link>
-                  <span className="ml-2 text-slate-500">
-                    mobilized {new Date(p.mobilizedDate).toLocaleDateString()} · late {p.lateCount} · missing {p.missingCount}
-                    {p.paymentWithheld && ' · payment withheld'}
-                    {p.suspended && ' · suspended'}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                </h3>
+                <p className="mb-3 text-xs text-slate-500">
+                  Mobilized {p.mobilizedDate ? new Date(p.mobilizedDate).toLocaleDateString() : '—'} · late {p.lateCount} · missing {p.missingCount}
+                  {p.paymentWithheld && ' · payment withheld'}
+                  {p.suspended && ' · suspended'}
+                </p>
+                <DocumentHistoryTable documents={p.documents} getViewUrl={(key) => api.getDocumentViewUrl(s.subId, key)} />
+              </div>
+            ))}
           </div>
         )}
 

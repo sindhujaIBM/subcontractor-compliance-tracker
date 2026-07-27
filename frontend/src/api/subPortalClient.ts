@@ -29,6 +29,9 @@ export interface SubPortalDocument {
   status: string;
   expiresAt?: string;
   rejectionReason?: string;
+  sourceKey?: string;
+  period?: string;
+  late?: boolean;
 }
 
 export interface SubPortalProject {
@@ -40,6 +43,7 @@ export interface SubPortalProject {
   missingCount: number;
   payrollCascadeStage?: string;
   workforceCascadeStage?: string;
+  documents: SubPortalDocument[];
 }
 
 export async function tryLogin(subId: string, password: string): Promise<boolean> {
@@ -74,4 +78,7 @@ export const subPortalApi = {
       .then((r) => r.data.data),
 
   uploadToS3: (uploadUrl: string, file: File) => axios.put(uploadUrl, file, { headers: { 'Content-Type': file.type || 'application/pdf' } }),
+
+  getDocumentViewUrl: (subId: string, key: string) =>
+    client.get<{ data: { url: string } }>(`/sub-portal/${subId}/documents/view-url`, { params: { key } }).then((r) => r.data.data.url),
 };

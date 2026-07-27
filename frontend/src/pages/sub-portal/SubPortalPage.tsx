@@ -3,6 +3,7 @@ import { subPortalApi, type SubPortalDocument, type SubPortalProject } from '../
 import { getUsername, clearCredentials } from '../../api/authStorage';
 import { StatusPill } from '../../components/subs/StatusPill';
 import { DocUploadButton } from '../../components/subs/DocUploadButton';
+import { DocumentHistoryTable } from '../../components/subs/DocumentHistoryTable';
 
 interface Profile {
   subcontractor: { subId: string; name: string; trade: string; onboardingStatus: string; suspended: boolean; color: 'green' | 'yellow' | 'red' };
@@ -75,25 +76,7 @@ export function SubPortalPage() {
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <h3 className="mb-3 text-sm font-semibold text-slate-700">Your Submission History</h3>
-          <table className="w-full text-sm">
-            <tbody>
-              {documents.map((d) => (
-                <tr key={d.SK} className="border-t border-slate-100">
-                  <td className="py-2 font-medium">{d.docType}</td>
-                  <td className="py-2 text-slate-500">{new Date(d.submittedAt).toLocaleDateString()}</td>
-                  <td className="py-2">{d.status}</td>
-                  <td className="py-2 text-slate-500">{d.rejectionReason}</td>
-                </tr>
-              ))}
-              {documents.length === 0 && (
-                <tr>
-                  <td className="py-2 text-slate-400" colSpan={4}>
-                    Nothing submitted yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <DocumentHistoryTable documents={documents as SubPortalDocument[]} getViewUrl={(key) => subPortalApi.getDocumentViewUrl(s.subId, key)} />
         </div>
 
         {projects.map((p) => {
@@ -102,13 +85,14 @@ export function SubPortalPage() {
           const month = today.toISOString().slice(0, 7);
           return (
             <div key={p.projectId} className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="mb-2 text-sm font-semibold text-slate-700">Project: {p.projectId}</h3>
+              <h3 className="mb-1 text-sm font-semibold text-slate-700">Project: {p.projectId}</h3>
               <p className="mb-3 text-xs text-slate-500">
-                Late submissions: {p.lateCount} · Missing submissions: {p.missingCount}
+                Mobilized {p.mobilizedDate ? new Date(p.mobilizedDate).toLocaleDateString() : '—'} · Late submissions: {p.lateCount} · Missing
+                submissions: {p.missingCount}
                 {p.paymentWithheld && ' · Payment withheld'}
                 {p.suspended && ' · Suspended'}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="mb-3 flex flex-wrap gap-2">
                 <DocUploadButton
                   label="Upload Certified Payroll Report"
                   onUpload={(f) => uploadProjectDoc(p.projectId, 'PAYROLL', weekEnding, weekEnding, f)}
@@ -118,6 +102,7 @@ export function SubPortalPage() {
                   onUpload={(f) => uploadProjectDoc(p.projectId, 'WORKFORCE', month, `${month}-05`, f)}
                 />
               </div>
+              <DocumentHistoryTable documents={p.documents} getViewUrl={(key) => subPortalApi.getDocumentViewUrl(s.subId, key)} />
             </div>
           );
         })}

@@ -110,4 +110,7 @@ export const api = {
 
   reinstateSubcontractor: (projectId: string, subId: string, actorName: string) =>
     client.post(`/projects/${projectId}/subcontractors/${subId}/reinstate`, { actorName }).then((r) => r.data.data),
+
+  getDocumentViewUrl: (subId: string, key: string) =>
+    client.get<{ data: { url: string } }>(`/subcontractors/${subId}/documents/view-url`, { params: { key } }).then((r) => r.data.data.url),
 };

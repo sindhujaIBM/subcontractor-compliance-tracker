@@ -145,6 +145,16 @@ functions:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
 
+  getDocumentViewUrl:
+    handler: src/handlers/getDocumentViewUrl.handler
+    events:
+      - http:
+          path: /subcontractors/{subId}/documents/view-url
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+
   listProjects:
     handler: src/handlers/listProjects.handler
     events:
@@ -305,6 +315,16 @@ functions:
       - http:
           path: /sub-portal/{subId}/projects/{projectId}/documents/{docType}/upload-url
           method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+
+  getSubPortalDocumentViewUrl:
+    handler: src/handlers/getSubPortalDocumentViewUrl.handler
+    events:
+      - http:
+          path: /sub-portal/{subId}/documents/view-url
+          method: get
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
