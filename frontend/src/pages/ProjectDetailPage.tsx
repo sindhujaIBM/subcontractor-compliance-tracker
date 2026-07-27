@@ -32,6 +32,17 @@ export function ProjectDetailPage() {
 
   if (loading || !project) return <PageShell title="Project">Loading…</PageShell>;
 
+  const today = new Date();
+  const weekEnding = today.toISOString().slice(0, 10);
+  const month = today.toISOString().slice(0, 7);
+
+  async function runCascadeCheck(subId: string) {
+    if (!project) return;
+    await api.runProjectCascadeCheck(project.projectId, subId, { docType: 'PAYROLL', period: weekEnding, dueDate: weekEnding });
+    await api.runProjectCascadeCheck(project.projectId, subId, { docType: 'WORKFORCE', period: month, dueDate: `${month}-05` });
+    await reload();
+  }
+
   return (
     <PageShell title={project.name} subtitle={project.address}>
       <div className="space-y-4">
@@ -103,6 +114,12 @@ export function ProjectDetailPage() {
                     }}
                   />
                 )}
+                <button
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                  onClick={() => runCascadeCheck(a.subId)}
+                >
+                  Run cascade check
+                </button>
               </div>
             </div>
           );

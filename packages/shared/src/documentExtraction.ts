@@ -54,7 +54,10 @@ const TOOLS: Record<ExtractableDocType, { name: string; description: string; inp
     input_schema: {
       type: 'object',
       properties: {
-        participationPercent: { type: 'number', description: 'MWBE/DBE participation percentage reported, as a number (e.g. 22.5 for 22.5%).' },
+        participationPercent: {
+          type: 'number',
+          description: 'MWBE/DBE participation percentage reported, as a number (e.g. 22.5 for 22.5%). -1 if not stated anywhere on the document.',
+        },
       },
       required: ['participationPercent'],
     },

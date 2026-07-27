@@ -25,6 +25,9 @@ export function validateRecurringDoc(docType: 'PAYROLL' | 'WORKFORCE', fields: R
     if (!fields.totalHours || Number(fields.totalHours) <= 0) return { valid: false, reason: 'No hours reported' };
     return { valid: true };
   }
-  if (fields.participationPercent === undefined) return { valid: false, reason: 'Missing participation percentage' };
+  const participationPercent = fields.participationPercent;
+  if (participationPercent === undefined || Number(participationPercent) < 0) {
+    return { valid: false, reason: 'Missing participation percentage' };
+  }
   return { valid: true };
 }
