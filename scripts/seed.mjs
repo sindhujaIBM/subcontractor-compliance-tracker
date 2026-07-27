@@ -76,9 +76,13 @@ const SUBS = [
 ];
 
 // projectId -> [{ subId, mobilizedDate }]
+// precision-drywall, ironline-steel, and northgate-roofing are deliberately
+// excluded here — seed-scenarios.mjs leaves them mid onboarding-cascade
+// (COI/W-9 never completed), and a sub can't be mobilized onto a project
+// before onboarding is done, per the onboarding-then-mobilize flow.
 const ASSIGNMENTS = {
-  'riverside-tower': ['apex-electrical', 'bedrock-concrete', 'cornerstone-plumbing', 'precision-drywall', 'summit-hvac', 'ironline-steel', 'sentinel-security', 'titan-masonry'],
-  'elm-street-water-plant': ['apex-electrical', 'bedrock-concrete', 'northgate-roofing', 'guardian-fire-safety'],
+  'riverside-tower': ['apex-electrical', 'bedrock-concrete', 'cornerstone-plumbing', 'summit-hvac', 'sentinel-security', 'titan-masonry'],
+  'elm-street-water-plant': ['apex-electrical', 'bedrock-concrete', 'guardian-fire-safety'],
   'harbor-retail-fitout': ['evergreen-landscaping', 'freshcoat-painting', 'clearview-glazing'],
 };
 
