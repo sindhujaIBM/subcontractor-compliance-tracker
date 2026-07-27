@@ -11,6 +11,12 @@
 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { hashPassword } from '@compliance-tracker/shared';
+
+// Every seeded subcontractor logs into the sub portal with their subId as
+// username and this shared password — easy to type live in a demo. Real
+// per-sub passwords would obviously never be identical or this predictable.
+const DEMO_SUB_PASSWORD = 'Passw0rd!';
 
 const TABLE = process.env.DYNAMO_TABLE || 'compliance-tracker-prod';
 const REGION = process.env.AWS_REGION || 'ca-west-1';
@@ -91,9 +97,10 @@ async function main() {
       onboardingStatus: 'pending',
       suspended: false,
       createdAt: now,
+      passwordHash: hashPassword(DEMO_SUB_PASSWORD),
     });
   }
-  console.log(`Seeded ${SUBS.length} subcontractors.`);
+  console.log(`Seeded ${SUBS.length} subcontractors. Sub portal login: subId as username, password "${DEMO_SUB_PASSWORD}" for all of them.`);
 
   let assignmentCount = 0;
   for (const [projectId, subIds] of Object.entries(ASSIGNMENTS)) {

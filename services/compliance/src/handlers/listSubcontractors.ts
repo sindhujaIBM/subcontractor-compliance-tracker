@@ -1,7 +1,7 @@
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { withHandler, ok, getDynamo, TABLE, onboardingColor } from '@compliance-tracker/shared';
+import { withComplianceAuth, ok, getDynamo, TABLE, onboardingColor } from '@compliance-tracker/shared';
 
-export const handler = withHandler(async () => {
+export const handler = withComplianceAuth(async () => {
   const db = getDynamo();
   const result = await db.send(
     new QueryCommand({

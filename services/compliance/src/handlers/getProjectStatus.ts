@@ -1,11 +1,11 @@
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { withHandler, ok, getDynamo, TABLE, ValidationError, NotFoundError, projectAssignmentColor } from '@compliance-tracker/shared';
+import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, NotFoundError, projectAssignmentColor } from '@compliance-tracker/shared';
 
 function isAssignmentRow(sk: unknown): boolean {
   return typeof sk === 'string' && sk.split('#').length === 2 && sk.startsWith('SUB#');
 }
 
-export const handler = withHandler(async (event) => {
+export const handler = withComplianceAuth(async (event) => {
   const projectId = event.pathParameters?.projectId;
   if (!projectId) throw new ValidationError('projectId is required');
 

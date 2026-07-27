@@ -1,5 +1,5 @@
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { withHandler, ok, getDynamo, TABLE } from '@compliance-tracker/shared';
+import { withComplianceAuth, ok, getDynamo, TABLE } from '@compliance-tracker/shared';
 
 function isAssignmentRow(sk: unknown): boolean {
   return typeof sk === 'string' && sk.split('#').length === 2 && sk.startsWith('SUB#');
@@ -27,7 +27,7 @@ interface MissingDocEntry {
   paymentWithheld: boolean;
 }
 
-export const handler = withHandler(async () => {
+export const handler = withComplianceAuth(async () => {
   const db = getDynamo();
 
   const [subsResult, projectsResult] = await Promise.all([

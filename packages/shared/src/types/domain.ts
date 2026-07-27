@@ -23,6 +23,8 @@ export interface Subcontractor {
   suspended: boolean;
   suspendedReason?: string;
   createdAt: string;
+  /** salt:hash — see packages/shared/src/passwords.ts. Login username is the subId itself. */
+  passwordHash?: string;
 }
 
 export interface OnboardingDocument {

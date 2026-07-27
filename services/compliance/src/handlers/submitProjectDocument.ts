@@ -1,16 +1,7 @@
 import { TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { withHandler, ok, getDynamo, TABLE, ValidationError } from '@compliance-tracker/shared';
+import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, validateRecurringDoc } from '@compliance-tracker/shared';
 
-function validateRecurringDoc(docType: 'PAYROLL' | 'WORKFORCE', fields: Record<string, unknown>): { valid: boolean; reason?: string } {
-  if (docType === 'PAYROLL') {
-    if (!fields.totalHours || Number(fields.totalHours) <= 0) return { valid: false, reason: 'No hours reported' };
-    return { valid: true };
-  }
-  if (fields.participationPercent === undefined) return { valid: false, reason: 'Missing participation percentage' };
-  return { valid: true };
-}
-
-export const handler = withHandler(async (event) => {
+export const handler = withComplianceAuth(async (event) => {
   const { projectId, subId, docType } = event.pathParameters ?? {};
   if (!projectId || !subId || !docType) throw new ValidationError('projectId, subId, and docType are required');
   if (docType !== 'PAYROLL' && docType !== 'WORKFORCE') throw new ValidationError('docType must be PAYROLL or WORKFORCE');

@@ -19,6 +19,9 @@ provider:
     CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
     SES_FROM_EMAIL: ${env:SES_FROM_EMAIL, '"ClearComply Compliance Bot" <noreply@maidlink.ca>'}
     SES_CONFIG_SET: ${env:SES_CONFIG_SET, ''}
+    UPLOAD_BUCKET: ${env:UPLOAD_BUCKET, 'compliance-tracker-uploads-prod-946839354953'}
+    COMPLIANCE_USERNAME: ${ssm:/compliance-tracker/prod/compliance-username}
+    COMPLIANCE_PASSWORD: ${ssm:/compliance-tracker/prod/compliance-password}
   iam:
     role:
       statements:
@@ -41,6 +44,18 @@ provider:
           Resource:
             - arn:aws:ses:us-east-1:946839354953:identity/maidlink.ca
             - arn:aws:ses:us-east-1:946839354953:configuration-set/MaidlinkConfigSet-prod
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+          Resource:
+            - arn:aws:s3:::${env:UPLOAD_BUCKET, 'compliance-tracker-uploads-prod-946839354953'}/*
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+          Resource:
+            - arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+            - arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0
 
 resources:
   Resources:
@@ -86,6 +101,28 @@ resources:
             Projection:
               ProjectionType: ALL
 
+    # Uploaded COI/W-9/Payroll/Workforce documents. Notification wired
+    # manually (rather than via serverless's built-in `s3` function event)
+    # because the bucket is an explicit resource with a fixed name, not one
+    # serverless creates and owns itself.
+    UploadsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${env:UPLOAD_BUCKET, 'compliance-tracker-uploads-prod-946839354953'}
+        NotificationConfiguration:
+          LambdaConfigurations:
+            - Event: s3:ObjectCreated:*
+              Function: !GetAtt ProcessUploadedDocumentLambdaFunction.Arn
+
+    UploadsBucketInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt ProcessUploadedDocumentLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: s3.amazonaws.com
+        SourceArn: arn:aws:s3:::${env:UPLOAD_BUCKET, 'compliance-tracker-uploads-prod-946839354953'}
+        SourceAccount: !Ref AWS::AccountId
+
 functions:
   # --- read endpoints ---
   listSubcontractors:
@@ -96,7 +133,7 @@ functions:
           method: get
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   getSubcontractor:
     handler: src/handlers/getSubcontractor.handler
@@ -106,7 +143,7 @@ functions:
           method: get
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   listProjects:
     handler: src/handlers/listProjects.handler
@@ -116,7 +153,7 @@ functions:
           method: get
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   getProjectStatus:
     handler: src/handlers/getProjectStatus.handler
@@ -126,7 +163,7 @@ functions:
           method: get
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   listMissingDocuments:
     handler: src/handlers/listMissingDocuments.handler
@@ -136,7 +173,7 @@ functions:
           method: get
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   # --- document submission (re-enters AI validation) ---
   submitSubDocument:
@@ -147,7 +184,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   submitProjectDocument:
     handler: src/handlers/submitProjectDocument.handler
@@ -157,7 +194,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   # --- cascade checks (real SES send) ---
   runSubCascadeCheck:
@@ -168,7 +205,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   runProjectCascadeCheck:
     handler: src/handlers/runProjectCascadeCheck.handler
@@ -178,7 +215,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   # --- human actions (never automatic) ---
   suspendSubOnboarding:
@@ -189,7 +226,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   reinstateSubOnboarding:
     handler: src/handlers/reinstateSubOnboarding.handler
@@ -199,7 +236,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   withholdPayment:
     handler: src/handlers/withholdPayment.handler
@@ -209,7 +246,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   releasePayment:
     handler: src/handlers/releasePayment.handler
@@ -219,7 +256,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   suspendSubcontractor:
     handler: src/handlers/suspendSubcontractor.handler
@@ -229,7 +266,7 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
 
   reinstateSubcontractor:
     handler: src/handlers/reinstateSubcontractor.handler
@@ -239,7 +276,45 @@ functions:
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
-            headers: [Content-Type]
+            headers: [Content-Type, Authorization]
+
+  # --- sub-facing portal (per-subcontractor Basic Auth, not the compliance login) ---
+  getSubPortalProfile:
+    handler: src/handlers/getSubPortalProfile.handler
+    events:
+      - http:
+          path: /sub-portal/{subId}
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+
+  requestSubUploadUrl:
+    handler: src/handlers/requestSubUploadUrl.handler
+    events:
+      - http:
+          path: /sub-portal/{subId}/documents/{docType}/upload-url
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+
+  requestProjectUploadUrl:
+    handler: src/handlers/requestProjectUploadUrl.handler
+    events:
+      - http:
+          path: /sub-portal/{subId}/projects/{projectId}/documents/{docType}/upload-url
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+
+  # --- S3-triggered: reads the uploaded file, sends it to Claude via Bedrock for
+  # field extraction, then runs the same validation logic submitSubDocument uses ---
+  processUploadedDocument:
+    handler: src/handlers/processUploadedDocument.handler
+    timeout: 30
+    memorySize: 512
 
 custom:
   esbuild:

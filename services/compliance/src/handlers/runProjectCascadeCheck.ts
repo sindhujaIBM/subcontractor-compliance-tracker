@@ -1,6 +1,6 @@
 import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import {
-  withHandler,
+  withComplianceAuth,
   ok,
   getDynamo,
   TABLE,
@@ -18,7 +18,7 @@ interface SubContact {
   name: string;
 }
 
-export const handler = withHandler(async (event) => {
+export const handler = withComplianceAuth(async (event) => {
   const { projectId, subId } = event.pathParameters ?? {};
   if (!projectId || !subId) throw new ValidationError('projectId and subId are required');
 

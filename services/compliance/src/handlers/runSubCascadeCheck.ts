@@ -1,6 +1,6 @@
 import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import {
-  withHandler,
+  withComplianceAuth,
   ok,
   getDynamo,
   TABLE,
@@ -29,7 +29,7 @@ async function missingOrInvalidDocTypes(db: ReturnType<typeof getDynamo>, subId:
   return missing;
 }
 
-export const handler = withHandler(async (event) => {
+export const handler = withComplianceAuth(async (event) => {
   const subId = event.pathParameters?.subId;
   if (!subId) throw new ValidationError('subId is required');
 

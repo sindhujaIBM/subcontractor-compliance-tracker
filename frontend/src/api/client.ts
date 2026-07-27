@@ -1,8 +1,36 @@
 import axios from 'axios';
+import { getAuthHeader, clearCredentials } from './authStorage';
 
 const baseURL = import.meta.env.VITE_API_URL || 'https://8lr32bnqsc.execute-api.ca-west-1.amazonaws.com/prod';
 
 const client = axios.create({ baseURL });
+
+client.interceptors.request.use((config) => {
+  const header = getAuthHeader('compliance');
+  if (header) config.headers.Authorization = header;
+  return config;
+});
+
+client.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      clearCredentials('compliance');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+export async function tryComplianceLogin(username: string, password: string): Promise<boolean> {
+  try {
+    const header = `Basic ${btoa(`${username}:${password}`)}`;
+    await axios.get(`${baseURL}/subcontractors`, { headers: { Authorization: header } });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface SubcontractorSummary {
   subId: string;

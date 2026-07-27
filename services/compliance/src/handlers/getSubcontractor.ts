@@ -1,7 +1,7 @@
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { withHandler, ok, getDynamo, TABLE, ValidationError, NotFoundError, onboardingColor } from '@compliance-tracker/shared';
+import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, NotFoundError, onboardingColor } from '@compliance-tracker/shared';
 
-export const handler = withHandler(async (event) => {
+export const handler = withComplianceAuth(async (event) => {
   const subId = event.pathParameters?.subId;
   if (!subId) throw new ValidationError('subId is required');
 

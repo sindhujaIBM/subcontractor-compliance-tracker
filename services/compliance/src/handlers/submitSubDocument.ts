@@ -1,27 +1,14 @@
 import { QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { withHandler, ok, getDynamo, TABLE, ValidationError } from '@compliance-tracker/shared';
+import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, validateOnboardingDoc } from '@compliance-tracker/shared';
 
 /**
- * Simulates the "AI scans for relevant fields" step with a simple,
- * deterministic, explainable rule rather than a real document-AI call —
- * building real OCR/extraction was an explicit, disclosed scope cut for
- * this prototype (see README). A resubmission always re-runs this check;
- * nothing is auto-accepted just because a file arrived.
+ * Manual-entry path — lets the compliance manager key in fields directly
+ * (or is used by the Loom demo without a physical file). Real subcontractor
+ * uploads go through requestSubUploadUrl -> S3 -> processUploadedDocument,
+ * which runs the exact same validateOnboardingDoc rule, just fed by
+ * AI-extracted fields instead of a typed request body.
  */
-function validateOnboardingDoc(docType: 'COI' | 'W9', fields: Record<string, unknown>): { valid: boolean; reason?: string } {
-  if (docType === 'COI') {
-    const coverageLimit = Number(fields.coverageLimit ?? 0);
-    const expiresAt = fields.expiresAt ? new Date(String(fields.expiresAt)) : null;
-    if (coverageLimit < 1_000_000) return { valid: false, reason: 'Coverage limit below the required $1M minimum' };
-    if (!expiresAt || expiresAt.getTime() < Date.now()) return { valid: false, reason: 'Certificate is expired or missing an expiration date' };
-    return { valid: true };
-  }
-  const taxId = String(fields.taxId ?? '');
-  if (!/^\d{2}-?\d{7}$/.test(taxId)) return { valid: false, reason: 'Tax ID is missing or not a valid EIN format' };
-  return { valid: true };
-}
-
-export const handler = withHandler(async (event) => {
+export const handler = withComplianceAuth(async (event) => {
   const { subId, docType } = event.pathParameters ?? {};
   if (!subId || !docType) throw new ValidationError('subId and docType are required');
   if (docType !== 'COI' && docType !== 'W9') throw new ValidationError('docType must be COI or W9');

@@ -1,5 +1,5 @@
 import { TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { withHandler, ok, getDynamo, TABLE, ValidationError } from '@compliance-tracker/shared';
+import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError } from '@compliance-tracker/shared';
 
 /**
  * Project-level suspension. The 5-late/3-missing threshold only makes the
@@ -8,7 +8,7 @@ import { withHandler, ok, getDynamo, TABLE, ValidationError } from '@compliance-
  * reason (e.g. a safety incident); the system informs that judgment, it
  * never gates it.
  */
-export const handler = withHandler(async (event) => {
+export const handler = withComplianceAuth(async (event) => {
   const { projectId, subId } = event.pathParameters ?? {};
   if (!projectId || !subId) throw new ValidationError('projectId and subId are required');
 
