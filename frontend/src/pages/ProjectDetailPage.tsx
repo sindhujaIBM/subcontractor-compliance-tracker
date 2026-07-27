@@ -4,6 +4,7 @@ import { api, type Assignment, type ProjectSummary } from '../api/client';
 import { StatusPill } from '../components/subs/StatusPill';
 import { PageShell } from '../components/layout/PageShell';
 import { HumanActionButton } from '../components/actions/HumanActionButton';
+import { Toast, type ToastTone } from '../components/actions/Toast';
 
 const STAGE_LABEL: Record<string, string> = {
   reminderEarly: 'Early reminder sent',
@@ -12,11 +13,18 @@ const STAGE_LABEL: Record<string, string> = {
   escalated: 'Escalated — awaiting decision',
 };
 
+function describeCascadeLeg(label: string, result: { action: string; emailSentTo?: string }): string | null {
+  if (result.action === 'reminder') return `${label} reminder sent to ${result.emailSentTo}`;
+  if (result.action === 'escalate') return `${label} escalated — awaiting a human decision`;
+  return null;
+}
+
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
 
   async function reload() {
     if (!projectId) return;
@@ -36,16 +44,25 @@ export function ProjectDetailPage() {
   const weekEnding = today.toISOString().slice(0, 10);
   const month = today.toISOString().slice(0, 7);
 
-  async function runCascadeCheck(subId: string) {
+  async function runCascadeCheck(subId: string, subName: string) {
     if (!project) return;
-    await api.runProjectCascadeCheck(project.projectId, subId, { docType: 'PAYROLL', period: weekEnding, dueDate: weekEnding });
-    await api.runProjectCascadeCheck(project.projectId, subId, { docType: 'WORKFORCE', period: month, dueDate: `${month}-05` });
+    const payroll = await api.runProjectCascadeCheck(project.projectId, subId, { docType: 'PAYROLL', period: weekEnding, dueDate: weekEnding });
+    const workforce = await api.runProjectCascadeCheck(project.projectId, subId, { docType: 'WORKFORCE', period: month, dueDate: `${month}-05` });
     await reload();
+
+    const parts = [describeCascadeLeg('Payroll', payroll), describeCascadeLeg('Workforce', workforce)].filter((p): p is string => Boolean(p));
+    const tone: ToastTone = [payroll, workforce].some((r) => r.action === 'reminder')
+      ? 'success'
+      : [payroll, workforce].some((r) => r.action === 'escalate')
+        ? 'warning'
+        : 'neutral';
+    setToast({ message: parts.length ? `${subName} — ${parts.join(' · ')}` : `${subName} — no action needed right now`, tone });
   }
 
   return (
     <PageShell title={project.name} subtitle={project.address}>
       <div className="space-y-4">
+        {toast && <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />}
         {assignments.map((a) => {
           const suspendEligible = a.lateCount >= 5 || a.missingCount >= 3;
           return (
@@ -116,7 +133,7 @@ export function ProjectDetailPage() {
                 )}
                 <button
                   className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-                  onClick={() => runCascadeCheck(a.subId)}
+                  onClick={() => runCascadeCheck(a.subId, a.subName)}
                 >
                   Run cascade check
                 </button>

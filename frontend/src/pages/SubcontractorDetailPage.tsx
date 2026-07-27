@@ -4,7 +4,14 @@ import { api } from '../api/client';
 import { StatusPill } from '../components/subs/StatusPill';
 import { PageShell } from '../components/layout/PageShell';
 import { HumanActionButton } from '../components/actions/HumanActionButton';
+import { Toast, type ToastTone } from '../components/actions/Toast';
 import { DocumentHistoryTable, type HistoryDoc } from '../components/subs/DocumentHistoryTable';
+
+function describeCascadeResult(result: { action: string; stage?: string; emailSentTo?: string }): { message: string; tone: ToastTone } {
+  if (result.action === 'reminder') return { message: `Reminder email sent to ${result.emailSentTo}`, tone: 'success' };
+  if (result.action === 'escalate') return { message: 'Escalated — cascade exhausted, awaiting a human decision', tone: 'warning' };
+  return { message: `No action needed right now (stage: ${result.stage ?? 'n/a'})`, tone: 'neutral' };
+}
 
 const STAGE_LABEL: Record<string, string> = {
   reminderEarly: 'Early reminder sent',
@@ -49,6 +56,7 @@ export function SubcontractorDetailPage() {
   const { subId } = useParams<{ subId: string }>();
   const [data, setData] = useState<SubDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
 
   async function reload() {
     if (!subId) return;
@@ -68,6 +76,7 @@ export function SubcontractorDetailPage() {
   return (
     <PageShell title={s.name} subtitle={`${s.trade} · ${s.contactName} · ${s.contactEmail}`}>
       <div className="space-y-6">
+        {toast && <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />}
         {topIssue && (
           <div
             className={`rounded-lg border p-4 text-sm font-medium ${
@@ -112,7 +121,8 @@ export function SubcontractorDetailPage() {
             <button
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
               onClick={async () => {
-                await api.runSubCascadeCheck(s.subId);
+                const result = await api.runSubCascadeCheck(s.subId);
+                setToast(describeCascadeResult(result));
                 await reload();
               }}
             >
