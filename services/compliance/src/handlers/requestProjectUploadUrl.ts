@@ -1,5 +1,5 @@
 import { GetCommand } from '@aws-sdk/lib-dynamodb';
-import { withSubAuth, ok, getDynamo, TABLE, ValidationError, NotFoundError, getUploadPresignedUrl } from '@compliance-tracker/shared';
+import { withSubAuth, ok, getDynamo, TABLE, ValidationError, NotFoundError, ConflictError, getUploadPresignedUrl } from '@compliance-tracker/shared';
 
 const BUCKET = process.env.UPLOAD_BUCKET!;
 
@@ -19,6 +19,10 @@ export const handler = withSubAuth(async (event, subId) => {
   const db = getDynamo();
   const assignment = await db.send(new GetCommand({ TableName: TABLE, Key: { PK: `PROJECT#${projectId}`, SK: `SUB#${subId}` } }));
   if (!assignment.Item) throw new NotFoundError('You are not assigned to this project');
+  // A suspension is a human decision that a project manager made and hasn't
+  // reversed — the system shouldn't quietly keep accepting and validating
+  // new submissions as if that decision weren't in effect.
+  if (assignment.Item.suspended) throw new ConflictError('This project assignment is suspended. Submissions are not accepted until reinstated.');
 
   // dueDate travels in the key so the S3-triggered processor can determine
   // lateness without a second lookup.

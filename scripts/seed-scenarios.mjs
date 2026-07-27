@@ -40,9 +40,14 @@ function projectAction(projectId, subId, timestamp, actor, action, detail, reaso
   return { PK: `PROJECT#${projectId}`, SK: `SUB#${subId}#ACTION#${timestamp}`, projectId, subId, timestamp, actor, action, detail, reason };
 }
 
-/** Weekly payroll history, going back `weeks` from today, minus the periods listed as late/missing. */
-async function seedPayrollHistory(projectId, subId, weeks, { lateWeeksAgo = [], missingWeeksAgo = [] } = {}) {
-  for (let w = weeks; w >= 1; w--) {
+/**
+ * Weekly payroll history, going back `weeks` from today, minus the periods
+ * listed as late/missing. `endWeek` stops the history short of last week —
+ * for a sub that was suspended partway through, so no rows get generated
+ * for periods after the suspension actually happened.
+ */
+async function seedPayrollHistory(projectId, subId, weeks, { lateWeeksAgo = [], missingWeeksAgo = [], endWeek = 1 } = {}) {
+  for (let w = weeks; w >= endWeek; w--) {
     const weekEndingDate = daysAgo(w * 7).slice(0, 10);
     const dueDate = daysAgo(w * 7 - 2); // due 2 days after the week ends, matching the reminder cadence's "2 days before" framing in reverse
     if (missingWeeksAgo.includes(w)) {
@@ -210,10 +215,12 @@ async function main() {
 
   // ── Red: titan-masonry — onboarded fine, but project-suspended after 3 missing payroll submissions ──
   await onboardSub('titan-masonry');
-  await seedPayrollHistory('riverside-tower', 'titan-masonry', 8, { lateWeeksAgo: [1], missingWeeksAgo: [4, 5, 6] });
+  // Suspended partway through — endWeek stops the history there, so no
+  // submissions exist for the weeks after the suspension actually happened.
+  await seedPayrollHistory('riverside-tower', 'titan-masonry', 8, { missingWeeksAgo: [4, 5, 6], endWeek: 4 });
   await update('PROJECT#riverside-tower', 'SUB#titan-masonry', 'SET missingCount = :m, lateCount = :l, suspended = :true, suspendedReason = :r', {
     ':m': 3,
-    ':l': 1,
+    ':l': 0,
     ':true': true,
     ':r': 'Missed 3 consecutive certified payroll submissions.',
   });

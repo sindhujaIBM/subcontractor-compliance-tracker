@@ -1,5 +1,5 @@
-import { TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, validateRecurringDoc } from '@compliance-tracker/shared';
+import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, ConflictError, validateRecurringDoc } from '@compliance-tracker/shared';
 
 export const handler = withComplianceAuth(async (event) => {
   const { projectId, subId, docType } = event.pathParameters ?? {};
@@ -11,12 +11,15 @@ export const handler = withComplianceAuth(async (event) => {
   const dueDate: string = body.dueDate;
   if (!period || !dueDate) throw new ValidationError('period and dueDate are required');
 
+  const db = getDynamo();
+  const assignment = await db.send(new GetCommand({ TableName: TABLE, Key: { PK: `PROJECT#${projectId}`, SK: `SUB#${subId}` } }));
+  if (assignment.Item?.suspended) throw new ConflictError('This project assignment is suspended. Submissions are not accepted until reinstated.');
+
   const { valid, reason } = validateRecurringDoc(docType, body);
   const now = new Date().toISOString();
   const late = now > dueDate;
   const cascadeField = docType === 'PAYROLL' ? 'payrollCascadeStage' : 'workforceCascadeStage';
 
-  const db = getDynamo();
   await db.send(
     new TransactWriteCommand({
       TransactItems: [

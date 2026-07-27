@@ -86,10 +86,14 @@ export function SubPortalPage() {
             <StatusPill color={s.color} />
             <span className="text-sm text-slate-500">Onboarding: {s.onboardingStatus}</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <DocUploadButton label="Upload Insurance Certificate (COI)" onUpload={(f) => uploadOnboardingDoc('COI', f)} />
-            <DocUploadButton label="Upload W-9" onUpload={(f) => uploadOnboardingDoc('W9', f)} />
-          </div>
+          {s.suspended ? (
+            <p className="text-sm text-status-red">Onboarding is suspended — submissions are paused until reinstated.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <DocUploadButton label="Upload Insurance Certificate (COI)" onUpload={(f) => uploadOnboardingDoc('COI', f)} />
+              <DocUploadButton label="Upload W-9" onUpload={(f) => uploadOnboardingDoc('W9', f)} />
+            </div>
+          )}
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -116,16 +120,20 @@ export function SubPortalPage() {
                 {p.paymentWithheld && <span className="font-medium text-status-yellow">Payment withheld{p.paymentWithheldReason && ` — ${p.paymentWithheldReason}`}</span>}
                 {p.suspended && <span className="font-medium text-status-red">Suspended{p.suspendedReason && ` — ${p.suspendedReason}`}</span>}
               </div>
-              <div className="mb-3 flex flex-wrap gap-2">
-                <DocUploadButton
-                  label="Upload Certified Payroll Report"
-                  onUpload={(f) => uploadProjectDoc(p.projectId, 'PAYROLL', weekEnding, weekEnding, f)}
-                />
-                <DocUploadButton
-                  label="Upload Monthly Workforce Report"
-                  onUpload={(f) => uploadProjectDoc(p.projectId, 'WORKFORCE', month, `${month}-05`, f)}
-                />
-              </div>
+              {p.suspended ? (
+                <p className="mb-3 text-sm text-status-red">This project assignment is suspended — submissions are paused until reinstated.</p>
+              ) : (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <DocUploadButton
+                    label="Upload Certified Payroll Report"
+                    onUpload={(f) => uploadProjectDoc(p.projectId, 'PAYROLL', weekEnding, weekEnding, f)}
+                  />
+                  <DocUploadButton
+                    label="Upload Monthly Workforce Report"
+                    onUpload={(f) => uploadProjectDoc(p.projectId, 'WORKFORCE', month, `${month}-05`, f)}
+                  />
+                </div>
+              )}
               <DocumentHistoryTable documents={p.documents} getViewUrl={(key) => subPortalApi.getDocumentViewUrl(s.subId, key)} />
             </div>
           );

@@ -1,5 +1,5 @@
-import { QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, validateOnboardingDoc } from '@compliance-tracker/shared';
+import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { withComplianceAuth, ok, getDynamo, TABLE, ValidationError, ConflictError, validateOnboardingDoc } from '@compliance-tracker/shared';
 
 /**
  * Manual-entry path — lets the compliance manager key in fields directly
@@ -19,6 +19,8 @@ export const handler = withComplianceAuth(async (event) => {
   const docExpiresAt = docType === 'COI' ? body.expiresAt : undefined;
 
   const db = getDynamo();
+  const sub = await db.send(new GetCommand({ TableName: TABLE, Key: { PK: `SUB#${subId}`, SK: 'METADATA' } }));
+  if (sub.Item?.suspended) throw new ConflictError('Onboarding is suspended. Submissions are not accepted until reinstated.');
 
   await db.send(
     new TransactWriteCommand({
